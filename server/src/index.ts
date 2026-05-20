@@ -1,14 +1,14 @@
 import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
+import mainRouter from "./route/index.js"
 dotenv.config();
 const app = express();
 app.use(cors());
-
 app.use(express.json());
 
-console.log("hello")
 
+app.use("/api/v1", mainRouter);
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
     console.log(`app running on port ${PORT} `);
