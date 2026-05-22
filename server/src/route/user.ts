@@ -1,6 +1,7 @@
 import express from "express";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
+import {userRegisterSchema, userSignInSchema} from "../zod.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
@@ -10,11 +11,18 @@ const userRouter = express.Router();
 const client = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL})
 })
+
 userRouter.post("/register",async(req,res)  => {
-    const name=req.body.name;
-    const email=req.body.email;
-    const password=req.body.password;
-    const role=req.body.role;
+    const parseResult=userRegisterSchema.safeParse(req.body);
+    if(!parseResult.success){
+        res.status(400).json({
+            success:false,
+            message: parseResult.error.issues[0]?.message
+        });
+        return;
+    }
+    
+    const {name,email,password,role}=parseResult.data;
 
     const usernameExist=await client.user.findUnique({
         where:{
@@ -56,8 +64,16 @@ catch(error){
 
 //signup route
 userRouter.post("/signin",async(req,res)=>{
-    const email=req.body.email;
-    const password=req.body.password;
+    const parseResult=userSignInSchema.safeParse(req.body);
+    if(!parseResult.success){
+        res.status(400).json({
+            success:false,
+            message: parseResult.error.issues[0]?.message
+        });
+        return;
+    }
+    
+    const {email,password}=parseResult.data;
     const user=await client.user.findUnique({
         where:{
             email:email
@@ -72,7 +88,7 @@ userRouter.post("/signin",async(req,res)=>{
     else {
         const isPasswordValid=await bcrypt.compare(password,user.password);
         if(isPasswordValid){
-            const token=jwt.sign({userId:user.id},JWT_PASS,{expiresIn:"7h"});
+            const token=jwt.sign({userId:user.id,role:user.role},JWT_PASS,{expiresIn:"7h"});
             res.status(200).json({
                 success:true,
                 message:"you are successfully logged in",
