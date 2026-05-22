@@ -1,6 +1,5 @@
 import express from "express";
-import { PrismaClient } from "../generated/prisma/client.js";
-import { PrismaPg } from "@prisma/adapter-pg";
+
 import {userRegisterSchema, userSignInSchema} from "../zod.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -8,9 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 const JWT_PASS=process.env.JWT_SECRET || "default_secret_key";
 const userRouter = express.Router();
-const client = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL})
-})
+import client from "../prismaclient.js";
 
 userRouter.post("/register",async(req,res)  => {
     const parseResult=userRegisterSchema.safeParse(req.body);
