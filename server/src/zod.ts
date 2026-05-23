@@ -13,7 +13,7 @@ export const userSignInSchema=z.object({
 });
 
 export const bankSchema = z.object({
-  bussinessName: z.string().min(4, "Business name is required"),
+  businessName: z.string().min(4, "Business name is required"),
   accountNumber: z
     .string()
     .regex(/^\d{9,18}$/, "Invalid bank account number"),
