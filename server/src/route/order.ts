@@ -87,4 +87,109 @@ orderRouter.post('/verify', authMiddleware, async (req, res) => {
     }
 });
 
+orderRouter.post("/webhook", async (req, res) => {
+    const webhookSecret =process.env.RAZORPAY_WEBHOOK_SECRET || "";
+    const signature =req.headers['x-razorpay-signature'] as string;
+    const body = JSON.stringify(req.body);
+    const hmac = crypto.createHmac(
+      'sha256',
+      webhookSecret
+    );
+    hmac.update(body);
+    const generatedSignature =hmac.digest('hex');
+    if (generatedSignature === signature) {
+        const event = JSON.parse(body);
+        const eventType = event.event;
+        if (eventType === "payment.failed" ||eventType === "payment.captured") {
+            const payment =event.payload.payment.entity;
+            const webhookId =`${eventType}_${payment.id}`;
+
+            // IDEMPOTENCY CHECK
+            const existing =await client.transaction.findUnique({
+                where: {
+                  webhookEventId :webhookId
+                }
+            });
+            if (existing) {
+                return res.json({
+                  success: true,
+                  message: "Already processed"
+                });
+            }
+            if (eventType === "payment.failed") {
+                await client.transaction.update({
+                    where: {
+                      razorpayOrderId:payment.order_id
+                    },
+                    data: {
+                        webhookEventId:webhookId,
+                        status: "FAILED"
+                    }
+                });
+
+                console.log(
+                  `Payment failed for order ${payment.order_id}`
+                );
+            }
+            else {
+                await client.transaction.update({
+                    where: {
+                      razorpayOrderId:payment.order_id
+                    },
+                    data: {
+                        webhookEventId:webhookId,
+                        status: "SUCCESS",
+                        razorpayPaymentId:payment.id
+                    }
+                });
+                console.log(
+                  `Payment captured for order ${payment.order_id}`
+                );
+            }
+        }
+
+        // REFUND EVENT
+        else if (eventType === "refund.processed") {
+
+            const refund =event.payload.refund.entity;
+
+            const webhookId =`${eventType}_${refund.id}`;
+
+            // IDEMPOTENCY CHECK
+            const existing =await client.transaction.findUnique({
+                where: {
+                  webhookEventId: webhookId
+                }
+            });
+            if (existing) {
+                return res.json({
+                  success: true,
+                  message: "Already processed"
+                });
+            }
+
+            await client.transaction.updateMany({
+                where: {
+                    razorpayPaymentId: refund.payment_id
+                },
+                data: {
+                    webhookEventId: webhookId,
+                    status: "REFUNDED"
+                }
+            });
+            console.log(
+              `Refund processed for payment ${refund.payment_id}`
+            );
+        }
+        return res.json({
+          success: true
+        });
+
+    } else {
+        return res.status(400).json({
+          message: "Invalid webhook signature"
+        });
+    }
+});
+
 export default orderRouter;
