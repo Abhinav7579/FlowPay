@@ -111,7 +111,7 @@ orderRouter.post("/webhook", async (req, res) => {
                 }
             });
             if (existing) {
-                return res.json({
+                return res.status(200).json({
                   success: true,
                   message: "Already processed"
                 });
@@ -127,12 +127,20 @@ orderRouter.post("/webhook", async (req, res) => {
                     }
                 });
 
+                res.status(200).json({
+                  success: true,
+                  message: "Payment failure processed"
+                });
                 console.log(
                   `Payment failed for order ${payment.order_id}`
                 );
             }
             else {
-                await client.transaction.update({
+                try{
+
+               //atomic update
+                await client.$transaction(async (prisma) => {
+                    await prisma.transaction.update({
                     where: {
                       razorpayOrderId:payment.order_id
                     },
@@ -141,10 +149,51 @@ orderRouter.post("/webhook", async (req, res) => {
                         status: "SUCCESS",
                         razorpayPaymentId:payment.id
                     }
+                    });
+                    
+                    const vendor=await prisma.transaction.findUnique({
+                        where:{
+                             razorpayOrderId:payment.order_id
+                        }
+                    })
+                    if (!vendor) {
+                      throw new Error("Transaction not found");
+                    }
+
+                    await prisma.payout.create({
+                        data:{
+                            vendorId:vendor.vendorId,
+                            amount:(payment.amount)*0.009,
+                            scheduledFor:new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                        }
+                    })
+                    
+                    await prisma.platform.updateMany({
+                        data: {
+                            totalRevenue: {
+                                increment: payment.amount*0.001
+                            },
+                            totalGMV:{
+                                increment:payment.amount
+                            }
+                        }
+                    });
+                });
+                res.status(200).json({
+                  success: true,
+                  message: "Payment capture processed"
                 });
                 console.log(
                   `Payment captured for order ${payment.order_id}`
                 );
+            }
+            catch (err) {
+                console.error("Error processing payment capture webhook: ", err);
+                return res.status(500).json({
+                  success: false,
+                  message: "Failed to process payment capture webhook"
+                });
+            }
             }
         }
 
@@ -162,7 +211,7 @@ orderRouter.post("/webhook", async (req, res) => {
                 }
             });
             if (existing) {
-                return res.json({
+                return res.status(200).json({
                   success: true,
                   message: "Already processed"
                 });
@@ -180,10 +229,12 @@ orderRouter.post("/webhook", async (req, res) => {
             console.log(
               `Refund processed for payment ${refund.payment_id}`
             );
-        }
-        return res.json({
-          success: true
+             return res.status(200).json({
+                    success: true
         });
+         
+        }
+       
 
     } else {
         return res.status(400).json({
@@ -192,4 +243,30 @@ orderRouter.post("/webhook", async (req, res) => {
     }
 });
 
+orderRouter.get("/status/:orderId", authMiddleware, async (req, res) => {
+    const orderId = req.params.orderId;
+    const transaction = await client.transaction.findUnique({
+        where: {
+            //@ts-ignore
+            razorpayOrderId: orderId
+        }
+    });
+    if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+    }
+    res.json(transaction);
+});
+
+orderRouter.get("/my-orders", authMiddleware, async (req, res) => {
+    const customerId = req.user.userId;
+    const transactions = await client.transaction.findMany({
+        where: {
+            customerId: customerId
+        },
+        include: {
+            product: true
+        }
+    });
+    res.json(transactions);
+});
 export default orderRouter;

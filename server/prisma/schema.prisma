@@ -123,3 +123,11 @@ model FraudAlert {
   isResolved Boolean  @default(false)
   createdAt  DateTime @default(now())
 }
+
+model Platform {
+  id            String   @id @default(uuid())
+  totalRevenue  Float    @default(0)  //all time
+  monthRevenue  Float    @default(0)  //this month
+  totalGMV      Float    @default(0)  //total money processed
+  updatedAt     DateTime @updatedAt
+}
