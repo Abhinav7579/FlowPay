@@ -61,5 +61,33 @@ vendorRouter.post("/onboard", authMiddleware, roleCheck("VENDOR"), async (req, r
     }
 
 })
+vendorRouter.get("/transactions", authMiddleware, roleCheck("VENDOR"), async (req, res) => {
 
+    const userId = req.user.userId
+
+    const vendor = await client.vendor.findUnique({
+        where: { userId: userId }
+    });
+
+    if (!vendor) {
+        res.status(404).json({ message: "Vendor not found" });
+        return;
+    }
+
+    const transactions = await client.transaction.findMany({
+        where: {
+            vendorId: vendor.id
+        },
+        include: {
+            product: { select: { name: true } },
+            customer: { select: { name: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json({
+        success: true,
+        data: transactions
+    });
+})
 export default vendorRouter;

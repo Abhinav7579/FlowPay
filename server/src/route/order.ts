@@ -88,132 +88,133 @@ orderRouter.post('/verify', authMiddleware, async (req, res) => {
 });
 
 orderRouter.post("/webhook", async (req, res) => {
-    const webhookSecret =process.env.RAZORPAY_WEBHOOK_SECRET || "";
-    const signature =req.headers['x-razorpay-signature'] as string;
+    console.log("Webhook received");
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "";
+    const signature = req.headers['x-razorpay-signature'] as string;
     const body = JSON.stringify(req.body);
     const hmac = crypto.createHmac(
-      'sha256',
-      webhookSecret
+        'sha256',
+        webhookSecret
     );
     hmac.update(body);
-    const generatedSignature =hmac.digest('hex');
+    const generatedSignature = hmac.digest('hex');
     if (generatedSignature === signature) {
         const event = JSON.parse(body);
         const eventType = event.event;
-        if (eventType === "payment.failed" ||eventType === "payment.captured") {
-            const payment =event.payload.payment.entity;
-            const webhookId =`${eventType}_${payment.id}`;
+        if (eventType === "payment.failed" || eventType === "payment.captured") {
+            const payment = event.payload.payment.entity;
+            const webhookId = `${eventType}_${payment.id}`;
 
             // IDEMPOTENCY CHECK
-            const existing =await client.transaction.findUnique({
+            const existing = await client.transaction.findUnique({
                 where: {
-                  webhookEventId :webhookId
+                    webhookEventId: webhookId
                 }
             });
             if (existing) {
                 return res.status(200).json({
-                  success: true,
-                  message: "Already processed"
+                    success: true,
+                    message: "Already processed"
                 });
             }
             if (eventType === "payment.failed") {
                 await client.transaction.update({
                     where: {
-                      razorpayOrderId:payment.order_id
+                        razorpayOrderId: payment.order_id
                     },
                     data: {
-                        webhookEventId:webhookId,
+                        webhookEventId: webhookId,
                         status: "FAILED"
                     }
                 });
 
                 res.status(200).json({
-                  success: true,
-                  message: "Payment failure processed"
+                    success: true,
+                    message: "Payment failure processed"
                 });
                 console.log(
-                  `Payment failed for order ${payment.order_id}`
+                    `Payment failed for order ${payment.order_id}`
                 );
             }
             else {
-                try{
+                try {
 
-               //atomic update
-                await client.$transaction(async (prisma) => {
-                    await prisma.transaction.update({
-                    where: {
-                      razorpayOrderId:payment.order_id
-                    },
-                    data: {
-                        webhookEventId:webhookId,
-                        status: "SUCCESS",
-                        razorpayPaymentId:payment.id
-                    }
-                    });
-                    
-                    const vendor=await prisma.transaction.findUnique({
-                        where:{
-                             razorpayOrderId:payment.order_id
-                        }
-                    })
-                    if (!vendor) {
-                      throw new Error("Transaction not found");
-                    }
-
-                    await prisma.payout.create({
-                        data:{
-                            vendorId:vendor.vendorId,
-                            amount:(payment.amount)*0.009,
-                            scheduledFor:new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                        }
-                    })
-                    
-                    await prisma.platform.updateMany({
-                        data: {
-                            totalRevenue: {
-                                increment: payment.amount*0.001
+                    //atomic update
+                    await client.$transaction(async (prisma) => {
+                        await prisma.transaction.update({
+                            where: {
+                                razorpayOrderId: payment.order_id
                             },
-                            totalGMV:{
-                                increment:payment.amount
+                            data: {
+                                webhookEventId: webhookId,
+                                status: "SUCCESS",
+                                razorpayPaymentId: payment.id
                             }
+                        });
+
+                        const vendor = await prisma.transaction.findUnique({
+                            where: {
+                                razorpayOrderId: payment.order_id
+                            }
+                        })
+                        if (!vendor) {
+                            throw new Error("Transaction not found");
                         }
+
+                        await prisma.payout.create({
+                            data: {
+                                vendorId: vendor.vendorId,
+                                amount: (payment.amount) * 0.009,
+                                scheduledFor: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                            }
+                        })
+
+                        await prisma.platform.updateMany({
+                            data: {
+                                totalRevenue: {
+                                    increment: payment.amount * 0.001
+                                },
+                                totalGMV: {
+                                    increment: payment.amount
+                                }
+                            }
+                        });
                     });
-                });
-                res.status(200).json({
-                  success: true,
-                  message: "Payment capture processed"
-                });
-                console.log(
-                  `Payment captured for order ${payment.order_id}`
-                );
-            }
-            catch (err) {
-                console.error("Error processing payment capture webhook: ", err);
-                return res.status(500).json({
-                  success: false,
-                  message: "Failed to process payment capture webhook"
-                });
-            }
+                    res.status(200).json({
+                        success: true,
+                        message: "Payment capture processed"
+                    });
+                    console.log(
+                        `Payment captured for order ${payment.order_id}`
+                    );
+                }
+                catch (err) {
+                    console.error("Error processing payment capture webhook: ", err);
+                    return res.status(500).json({
+                        success: false,
+                        message: "Failed to process payment capture webhook"
+                    });
+                }
             }
         }
 
         // REFUND EVENT
         else if (eventType === "refund.processed") {
 
-            const refund =event.payload.refund.entity;
+            const refund = event.payload.refund.entity;
 
-            const webhookId =`${eventType}_${refund.id}`;
+            const webhookId = `${eventType}_${refund.id}`;
 
             // IDEMPOTENCY CHECK
-            const existing =await client.transaction.findUnique({
+            const existing = await client.transaction.findUnique({
                 where: {
-                  webhookEventId: webhookId
+                    webhookEventId: webhookId
                 }
             });
             if (existing) {
                 return res.status(200).json({
-                  success: true,
-                  message: "Already processed"
+                    success: true,
+                    message: "Already processed"
                 });
             }
 
@@ -227,18 +228,15 @@ orderRouter.post("/webhook", async (req, res) => {
                 }
             });
             console.log(
-              `Refund processed for payment ${refund.payment_id}`
+                `Refund processed for payment ${refund.payment_id}`
             );
-             return res.status(200).json({
-                    success: true
-        });
-         
+            res.status(200).json({
+                success: true
+            });
         }
-       
-
     } else {
         return res.status(400).json({
-          message: "Invalid webhook signature"
+            message: "Invalid webhook signature"
         });
     }
 });

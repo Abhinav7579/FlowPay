@@ -5,6 +5,7 @@ import adminRouter from "./admin.js";
 import productRouter from "./product.js";
 import orderRouter from "./order.js";
 import paymentRouter from "./payment.js";
+import customerRouter from "./customer.js";
 const router = express.Router();
 
 router.use("/user", userRouter);
@@ -13,4 +14,5 @@ router.use("/user/admin", adminRouter);
 router.use("/products", productRouter);
 router.use("/orders", orderRouter);
 router.use("/payments", paymentRouter);
+router.use("/customer", customerRouter);
 export default router;

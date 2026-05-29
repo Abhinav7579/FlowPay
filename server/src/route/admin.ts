@@ -60,4 +60,8 @@ adminRouter.post("/approve-vendor/:vendorId",authMiddleware,roleCheck("ADMIN"),a
         });
     }
 });
+
+adminRouter.get("/transactions",authMiddleware,roleCheck("ADMIN"),(req,res)=>{
+    
+})
 export default adminRouter;
