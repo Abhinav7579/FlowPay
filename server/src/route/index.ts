@@ -6,7 +6,10 @@ import productRouter from "./product.js";
 import orderRouter from "./order.js";
 import paymentRouter from "./payment.js";
 import customerRouter from "./customer.js";
+import testRouter from "./test.js";
 const router = express.Router();
+
+router.use("/test", testRouter);
 
 router.use("/user", userRouter);
 router.use("/user/vendor", vendorRouter);
