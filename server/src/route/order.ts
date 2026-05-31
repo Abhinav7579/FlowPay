@@ -161,6 +161,16 @@ orderRouter.post("/webhook", async (req, res) => {
                             throw new Error("Transaction not found");
                         }
 
+                        await prisma.vendor.update({
+                            where: {
+                                id: vendor.vendorId
+                            },
+                            data: {
+                                pendingPayout: { increment: 1 }
+                            }
+                        })
+
+
                         await prisma.payout.create({
                             data: {
                                 vendorId: vendor.vendorId,
