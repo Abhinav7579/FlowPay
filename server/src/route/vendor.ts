@@ -90,4 +90,28 @@ vendorRouter.get("/transactions", authMiddleware, roleCheck("VENDOR"), async (re
         data: transactions
     });
 })
+
+vendorRouter.get("/payouts", authMiddleware, roleCheck("VENDOR"), async (req, res) => {
+    const userId = req.user.userId
+    const vendor = await client.vendor.findUnique({
+        where: { userId: userId }
+    });
+    if (!vendor) {
+        res.status(404).json({ message: "Vendor not found" });
+        return;
+    }
+    const payouts = await client.payout.findMany({
+        where: {
+            vendorId: vendor.id
+        },
+        include: {
+            vendor: true
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json({
+        success: true,
+        data: payouts
+    });
+})
 export default vendorRouter;
