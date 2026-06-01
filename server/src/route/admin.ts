@@ -1,6 +1,7 @@
 import express from "express"
 const adminRouter = express.Router();
 import client from "../prismaclient.js";
+import payoutQueue from "../queues/payoutqueue.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { roleCheck } from "../middleware/roleMiddleware.js";
 adminRouter.get("/", authMiddleware, roleCheck("ADMIN"), (req, res) => {
@@ -71,7 +72,6 @@ adminRouter.get("/payouts", authMiddleware, roleCheck("ADMIN"), async (req, res)
             include: {
                 vendor: true
             }
-
         });
         res.status(200).json({
             success: true,
@@ -85,5 +85,31 @@ adminRouter.get("/payouts", authMiddleware, roleCheck("ADMIN"), async (req, res)
             message: "Internal server error" + error
         });
     }
+})
+
+adminRouter.get("/revenue", authMiddleware, roleCheck("ADMIN"), async (req, res) => {
+    try {
+        const revenue = await client.platform.findFirst({
+            where: {
+                id: "da543ea2-ae27-4fac-9f97-f65ca7d87f9e"
+            }
+        })
+        res.status(200).json({
+            success: true,
+            message: "Revenue",
+            data: revenue
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Internal server error" + error
+        });
+    }
+})
+
+adminRouter.post("/run-payout-now", authMiddleware, roleCheck("ADMIN"), async (req, res) => {
+    await payoutQueue.add("manual-payout", {});
+    res.json({ message: "Payout started" });
 })
 export default adminRouter;
