@@ -17,7 +17,8 @@ const worker = new Worker("payoutQueue",
 
             const payout = await client.payout.updateMany({
                 where: {
-                    vendorId: vendor.id
+                    vendorId: vendor.id,
+                    status: "SCHEDULED"
                 },
                 data: {
                     status: "PROCESSING",
@@ -27,7 +28,8 @@ const worker = new Worker("payoutQueue",
             try {
                 await client.payout.updateMany({
                     where: {
-                        vendorId: vendor.id
+                        vendorId: vendor.id,
+                        status: "PROCESSING"
                     },
                     data: {
                         status: "COMPLETED",
@@ -42,7 +44,10 @@ const worker = new Worker("payoutQueue",
             }
             catch (err) {
                 await client.payout.updateMany({
-                    where: { vendorId: vendor.id },
+                    where: {
+                        vendorId: vendor.id,
+                        status: "PROCESSING"
+                    },
                     data: { status: "FAILED" }
                 });
             }

@@ -166,7 +166,7 @@ orderRouter.post("/webhook", async (req, res) => {
                                 id: vendor.vendorId
                             },
                             data: {
-                                pendingPayout: { increment: 1 }
+                                pendingPayout: { increment: payment.amount * 0.009 }
                             }
                         })
 
@@ -175,7 +175,7 @@ orderRouter.post("/webhook", async (req, res) => {
                             data: {
                                 vendorId: vendor.vendorId,
                                 amount: (payment.amount) * 0.009,
-                                scheduledFor: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                                scheduledFor: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
                             }
                         })
 
