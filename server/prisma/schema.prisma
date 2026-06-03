@@ -20,7 +20,7 @@ model User {
   password  String
   role      Role     @default(CUSTOMER)
   createdAt DateTime @default(now())
-
+  isActive  Boolean  @default(true)
   vendor       Vendor?
   transactions Transaction[]
   payouts      Payout[]

@@ -1,7 +1,7 @@
 
 import client from "./prismaclient.js";
 import redis from "./config/redis.js";
-const checkFraud = async ({ customerId, amount, vendorId, cardId, ip }: { customerId: string, amount: number, vendorId: string, cardId: string, ip: string }) => {
+const checkFraud = async ({ customerId, amount, vendorId, cardId, ip }: { customerId: string, amount: number, vendorId: string, cardId: string | null, ip: string }) => {
     try {
         const reasons = [];
         let flag = false;
@@ -72,6 +72,7 @@ const checkFraud = async ({ customerId, amount, vendorId, cardId, ip }: { custom
     }
     catch (err) {
         console.log(err);
+        return { flag: false, reasons: [] };
     }
 
 

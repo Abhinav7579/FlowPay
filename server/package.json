@@ -26,9 +26,11 @@
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
-    "prisma": "^6.19.3",
     "razorpay": "^2.9.6",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
   }
 }

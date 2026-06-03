@@ -2,6 +2,7 @@ import express from 'express';
 const orderRouter = express.Router();
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import client from "../prismaclient.js";
+import checkFraud from "../FraudCheck.js";
 import dotenv from "dotenv"
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -138,6 +139,27 @@ orderRouter.post("/webhook", async (req, res) => {
             }
             else {
                 try {
+                    const transaction = await client.transaction.findUnique({
+                        where: {
+                            razorpayOrderId: payment.order_id
+                        },
+                        include: { customer: true }
+                    });
+
+                    if (!transaction) {
+                        return res.status(404).json({
+                            success: false,
+                            message: "Transaction not found"
+                        });
+                    }
+
+                    const fraudResult = await checkFraud({
+                        customerId: transaction.customerId,
+                        amount: transaction.totalAmount,
+                        vendorId: transaction.vendorId,
+                        cardId: event.payload.payment.entity.card.id || null,
+                        ip: req.ip as string
+                    });
 
                     //atomic update
                     await client.$transaction(async (prisma) => {
@@ -148,7 +170,9 @@ orderRouter.post("/webhook", async (req, res) => {
                             data: {
                                 webhookEventId: webhookId,
                                 status: "SUCCESS",
-                                razorpayPaymentId: payment.id
+                                razorpayPaymentId: payment.id,
+                                isFlagged: fraudResult.flag,
+                                flagReason: fraudResult.reasons.length > 0 ? fraudResult.reasons.join(",") : null
                             }
                         });
 
@@ -156,39 +180,53 @@ orderRouter.post("/webhook", async (req, res) => {
                             where: {
                                 razorpayOrderId: payment.order_id
                             }
-                        })
+                        });
                         if (!vendor) {
                             throw new Error("Transaction not found");
                         }
 
-                        await prisma.vendor.update({
-                            where: {
-                                id: vendor.vendorId
-                            },
-                            data: {
-                                pendingPayout: { increment: payment.amount * 0.009 }
-                            }
-                        })
+                        if (!fraudResult.flag) {
 
-
-                        await prisma.payout.create({
-                            data: {
-                                vendorId: vendor.vendorId,
-                                amount: (payment.amount) * 0.009,
-                                scheduledFor: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
-                            }
-                        })
-
-                        await prisma.platform.updateMany({
-                            data: {
-                                totalRevenue: {
-                                    increment: payment.amount * 0.001
+                            await prisma.vendor.update({
+                                where: {
+                                    id: vendor.vendorId
                                 },
-                                totalGMV: {
-                                    increment: payment.amount
+                                data: {
+                                    pendingPayout: { increment: payment.amount * 0.009 }
                                 }
-                            }
-                        });
+                            });
+
+
+                            await prisma.payout.create({
+                                data: {
+                                    vendorId: vendor.vendorId,
+                                    amount: (payment.amount) * 0.009,
+                                    scheduledFor: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+                                }
+                            });
+
+                            await prisma.platform.updateMany({
+                                data: {
+                                    totalRevenue: {
+                                        increment: payment.amount * 0.001
+                                    },
+                                    totalGMV: {
+                                        increment: payment.amount
+                                    }
+                                }
+                            });
+                        }
+                        if (fraudResult.flag) {
+                            await prisma.fraudAlert.create({
+                                data: {
+                                    type: fraudResult.reasons[0] || "Suspicious Activity",
+                                    details: fraudResult.reasons.join(", ") || "No reasons specified",
+                                    vendorId: transaction.vendorId,
+                                    userId: transaction.customerId,
+                                    amount: transaction.totalAmount
+                                }
+                            });
+                        }
                     });
                     res.status(200).json({
                         success: true,
