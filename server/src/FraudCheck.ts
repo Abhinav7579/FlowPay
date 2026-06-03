@@ -1,23 +1,10 @@
-import type { Request, Response, NextFunction } from "express";
-import redis from "../config/redis.js"
-import client from "../prismaclient.js";
 
-declare global {
-    namespace Express {
-        interface Request {
-            user?: any;
-            flag?: boolean;
-            reasons?: string[];
-        }
-    }
-}
-export const fraudMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+import client from "./prismaclient.js";
+import redis from "./config/redis.js";
+const checkFraud = async ({ customerId, amount, vendorId, cardId, ip }: { customerId: string, amount: number, vendorId: string, cardId: string, ip: string }) => {
     try {
         const reasons = [];
         let flag = false;
-        const { amount, cardId, vendorId } = req.body;
-        const ip = req.ip;
-        const customerId = req.user.userId;
         const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
         const recentPayments = await client.transaction.count({
@@ -80,12 +67,13 @@ export const fraudMiddleware = async (req: Request, res: Response, next: NextFun
             reasons.push("3+ cards from same IP");
         }
 
-        req.flag = flag;
-        req.reasons = reasons;
-        next();
+        return { flag, reasons };
+
     }
     catch (err) {
-        next(err);
+        console.log(err);
     }
 
+
 }
+export default checkFraud;

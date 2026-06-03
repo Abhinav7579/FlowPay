@@ -7,7 +7,12 @@ const worker = new Worker("payoutQueue",
         const vendors = await client.vendor.findMany({
             where: {
                 pendingPayout: { gt: 0 },
-                isApproved: true
+                isApproved: true,
+                transactions: {
+                    none: {
+                        isFlagged: true
+                    }
+                }
             }
             , include: {
                 user: { select: { email: true, name: true } }
