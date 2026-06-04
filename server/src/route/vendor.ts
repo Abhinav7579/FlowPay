@@ -114,4 +114,38 @@ vendorRouter.get("/payouts", authMiddleware, roleCheck("VENDOR"), async (req, re
         data: payouts
     });
 })
+
+vendorRouter.post("/change-bank-details", authMiddleware, roleCheck("VENDOR"), async (req, res) => {
+    const parseResult = bankSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        res.status(400).json({
+            success: false,
+            message: parseResult.error.issues[0]?.message
+        });
+        return;
+    }
+    const userId = req.user.userId;
+    const { accountNumber, ifsc } = parseResult.data;
+    const vendor = await client.vendor.findUnique({
+        where: { userId: userId }
+    });
+    if (!vendor) {
+        res.status(404).json({ message: "Vendor not found" });
+        return;
+    }
+    const updatedVendor = await client.vendor.update({
+        where: {
+            userId: userId
+        },
+        data: {
+            bankAccount: accountNumber,
+            ifscCode: ifsc
+        }
+    });
+    res.status(200).json({
+        success: true,
+        message: "Bank details updated successfully",
+        data: updatedVendor
+    });
+})
 export default vendorRouter;

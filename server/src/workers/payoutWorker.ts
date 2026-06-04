@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import redisConnection from "../config/redis.js";
 import client from "../prismaclient.js";
+import emailQueue from "../queues/emailqueue.js";
 
 const worker = new Worker("payoutQueue",
     async (job) => {
@@ -45,6 +46,22 @@ const worker = new Worker("payoutQueue",
                     where: { id: vendor.id },
                     data: { pendingPayout: 0 }
                 });
+                const vendorDetails = await client.vendor.findFirst({
+                    where: {
+                        id: vendor.id
+                    },
+                    include: {
+                        user: true
+                    }
+                })
+                await emailQueue.add("payout-success", {
+                    email: vendorDetails?.user?.email,
+                    name: vendorDetails?.user?.name,
+                    subject: "Payout Processed",
+                    body: "Your payout has been processed successfully"
+                });
+
+
 
             }
             catch (err) {
@@ -55,6 +72,28 @@ const worker = new Worker("payoutQueue",
                     },
                     data: { status: "FAILED" }
                 });
+                const vendorDetails = await client.vendor.findFirst({
+                    where: {
+                        id: vendor.id
+                    },
+                    include: {
+                        user: true
+                    }
+                })
+
+                await emailQueue.add("payout-failed", {
+                    email: vendorDetails?.user?.email,
+                    name: vendorDetails?.user?.name,
+                    subject: "Payout Failed",
+                    body: "Your payout has been failed . we will try again later"
+                });
+                await emailQueue.add("payout-failed-to-admin", {
+                    email: "abhinavsyunary@gmail.com",
+                    name: "Admin",
+                    subject: "Payout Failed for " + vendorDetails?.user?.name,
+                    body: "Your payout for " + vendorDetails?.user?.name + " has been failed ."
+                });
+
             }
         }
 

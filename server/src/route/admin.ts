@@ -1,6 +1,7 @@
 import express from "express"
 const adminRouter = express.Router();
 import client from "../prismaclient.js";
+import emailQueue from "../queues/emailqueue.js";
 import payoutQueue from "../queues/payoutqueue.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { roleCheck } from "../middleware/roleMiddleware.js";
@@ -39,6 +40,14 @@ adminRouter.post("/approve-vendor/:vendorId", authMiddleware, roleCheck("ADMIN")
         throw new Error("Invalid vendor id");
     }
     try {
+        const user = await client.vendor.findFirst({
+            where: {
+                id: vendorId
+            }
+        })
+        if (!user) {
+            throw new Error("Vendor not found");
+        }
         const vendor = await client.vendor.update({
             where: {
                 id: vendorId
@@ -47,6 +56,25 @@ adminRouter.post("/approve-vendor/:vendorId", authMiddleware, roleCheck("ADMIN")
                 isApproved: true
             }
         });
+
+        const userId = user.userId;
+        const vendorDetails = await client.user.findFirst({
+            where: {
+                id: userId
+            }
+        })
+        if (!vendorDetails) {
+            throw new Error("Vendor not found");
+        }
+
+        await emailQueue.add("vendorApproved", {
+            email: vendorDetails.email,
+            name: vendorDetails.name,
+            subject: "Vendor Approved",
+            body: "Your vendor account has been approved successfully"
+
+        });
+
         res.status(200).json({
             success: true,
             message: "Vendor approved successfully",
@@ -236,7 +264,7 @@ adminRouter.post("/flagged-transactions/:id/deactivate-customer", authMiddleware
         }
 
         const customerId = fraud.userId;
-        if(!customerId) {
+        if (!customerId) {
             res.status(400).json({
                 success: false,
                 message: "No customer associated with this fraud alert"

@@ -1,105 +1,106 @@
 import express from "express";
 
-import {userRegisterSchema, userSignInSchema} from "../zod.js";
+import { userRegisterSchema, userSignInSchema } from "../zod.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
-const JWT_PASS=process.env.JWT_SECRET || "default_secret_key";
+const JWT_PASS = process.env.JWT_SECRET || "default_secret_key";
 const userRouter = express.Router();
 import client from "../prismaclient.js";
 
-userRouter.post("/register",async(req,res)  => {
-    const parseResult=userRegisterSchema.safeParse(req.body);
-    if(!parseResult.success){
+userRouter.post("/register", async (req, res) => {
+    const parseResult = userRegisterSchema.safeParse(req.body);
+    if (!parseResult.success) {
         res.status(400).json({
-            success:false,
+            success: false,
             message: parseResult.error.issues[0]?.message
         });
         return;
     }
-    
-    const {name,email,password,role}=parseResult.data;
 
-    const usernameExist=await client.user.findUnique({
-        where:{
-            email:email
+    const { name, email, password, role } = parseResult.data;
+
+    const usernameExist = await client.user.findUnique({
+        where: {
+            email: email
         }
     });
-    if(usernameExist){
+    if (usernameExist) {
         res.status(400).json({
-            success:false,
-            message:"Email already exists"
+            success: false,
+            message: "Email already exists"
         });
+        return;
     } else {
-        try{
-        const hashedPassword=await bcrypt.hash(password,10);
-        const user=await client.user.create({
-            data:{
-                name:name,
-                email:email,
-                password:hashedPassword,
-                role:role
-            }
-})
- res.status(200).json({
-         success:true,
-        message:"you are successfully registered",
-        userId:user.id
-    })
+        try {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const user = await client.user.create({
+                data: {
+                    name: name,
+                    email: email,
+                    password: hashedPassword,
+                    role: role
+                }
+            })
+            res.status(200).json({
+                success: true,
+                message: "you are successfully registered",
+                userId: user.id
+            })
 
-}
-catch(error){
-    res.status(500).json({
-        success:false,
-        message:"Internal server error"+error
-    }); 
-}
+        }
+        catch (error) {
+            res.status(500).json({
+                success: false,
+                message: "Internal server error" + error
+            });
+        }
     }
 
 });
 
 //signup route
-userRouter.post("/signin",async(req,res)=>{
-    const parseResult=userSignInSchema.safeParse(req.body);
-    if(!parseResult.success){
+userRouter.post("/signin", async (req, res) => {
+    const parseResult = userSignInSchema.safeParse(req.body);
+    if (!parseResult.success) {
         res.status(400).json({
-            success:false,
+            success: false,
             message: parseResult.error.issues[0]?.message
         });
         return;
     }
-    
-    const {email,password}=parseResult.data;
-    const user=await client.user.findUnique({
-        where:{
-            email:email
+
+    const { email, password } = parseResult.data;
+    const user = await client.user.findUnique({
+        where: {
+            email: email
         }
     });
-    if(!user){
+    if (!user) {
         res.status(400).json({
-            success:false,
-            message:"Invalid email or password"
+            success: false,
+            message: "Invalid email or password"
         });
     }
     else {
-        const isPasswordValid=await bcrypt.compare(password,user.password);
-        if(isPasswordValid){
-            const token=jwt.sign({userId:user.id,role:user.role},JWT_PASS,{expiresIn:"7h"});
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (isPasswordValid) {
+            const token = jwt.sign({ userId: user.id, role: user.role }, JWT_PASS, { expiresIn: "7h" });
             res.status(200).json({
-                success:true,
-                message:"you are successfully logged in",
-                token:token,
-                role:user.role
+                success: true,
+                message: "you are successfully logged in",
+                token: token,
+                role: user.role
             });
         }
         else {
             res.status(400).json({
-                success:false,
-                message:"Invalid email or password"
+                success: false,
+                message: "Invalid email or password"
             });
         }
-        
+
     }
 })
 export default userRouter;

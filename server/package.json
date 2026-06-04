@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsc -b && node dist/index.js",
-    "worker": "tsx src/workers/emailWorker.ts && tsx src/workers/payoutWorker.ts && tsx src/workers/cronWorker.ts"
+    "worker": "tsx src/workers/runAll.ts"
   },
   "keywords": [],
   "author": "",

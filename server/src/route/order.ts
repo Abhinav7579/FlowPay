@@ -3,6 +3,7 @@ const orderRouter = express.Router();
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import client from "../prismaclient.js";
 import checkFraud from "../FraudCheck.js";
+import emailQueue from '../queues/emailqueue.js';
 import dotenv from "dotenv"
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -152,14 +153,38 @@ orderRouter.post("/webhook", async (req, res) => {
                             message: "Transaction not found"
                         });
                     }
+                    const user = await client.user.findUnique({
+                        where: {
+                            id: transaction.customerId
+                        }
+                    })
+                    if (!user) {
+                        throw new Error("User not found")
+                    }
+                    await emailQueue.add("payment-success", {
+                        email: user.email,
+                        name: user.name,
+                        subject: "Payment Success",
+                        body: "Payment Success of amount " + transaction.totalAmount + "."
+                    });
+
 
                     const fraudResult = await checkFraud({
                         customerId: transaction.customerId,
                         amount: transaction.totalAmount,
                         vendorId: transaction.vendorId,
-                        cardId: event.payload.payment.entity.card.id || null,
+                        cardId: event.payload.payment.entity.card?.id || null,
                         ip: req.ip as string
                     });
+
+                    if (fraudResult.flag) {
+                        await emailQueue.add("fraud-detected", {
+                            email: "abhinavsyunary@gmail.com",
+                            name: "Admin",
+                            subject: "Fraud Detected",
+                            body: "Fraud Detected on trasaction " + transaction.id + "."
+                        });
+                    }
 
                     //atomic update
                     await client.$transaction(async (prisma) => {
@@ -211,7 +236,7 @@ orderRouter.post("/webhook", async (req, res) => {
                                         increment: payment.amount * 0.001
                                     },
                                     totalGMV: {
-                                        increment: payment.amount
+                                        increment: payment.amount / 100
                                     }
                                 }
                             });
