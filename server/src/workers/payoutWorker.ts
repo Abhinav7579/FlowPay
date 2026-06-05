@@ -42,9 +42,16 @@ const worker = new Worker("payoutQueue",
                         processedAt: new Date()
                     }
                 })
+                const amount = vendor.pendingPayout;
+
                 await client.vendor.update({
                     where: { id: vendor.id },
-                    data: { pendingPayout: 0 }
+                    data: {
+                        pendingPayout: 0,
+                        totalEarnings: {
+                            increment: amount
+                        }
+                    }
                 });
                 const vendorDetails = await client.vendor.findFirst({
                     where: {
