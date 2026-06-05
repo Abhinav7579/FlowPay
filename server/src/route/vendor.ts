@@ -2,7 +2,7 @@ import express from "express"
 const vendorRouter = express.Router();
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { roleCheck } from "../middleware/roleMiddleware.js";
-import { bankSchema } from "../zod.js";
+import { bankSchema, productSchema } from "../zod.js";
 import client from "../prismaclient.js";
 
 vendorRouter.get("/", authMiddleware, roleCheck("VENDOR"), async (req, res) => {
@@ -148,4 +148,50 @@ vendorRouter.post("/change-bank-details", authMiddleware, roleCheck("VENDOR"), a
         data: updatedVendor
     });
 })
+
+vendorRouter.post("/add-product", authMiddleware, roleCheck("VENDOR"), async (req, res) => {
+    const parseResult = productSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        res.status(400).json({
+            success: false,
+            message: parseResult.error.issues[0]?.message
+        });
+        return;
+    }
+
+    const vendor = await client.vendor.findUnique({
+        where: {
+            userId: req.user.userId
+        }
+    })
+    if (!vendor) {
+        res.status(404).json({ message: "Vendor not found" });
+        return;
+    }
+    const { name, price, image } = parseResult.data;
+    try {
+        await client.product.create({
+            data: {
+                name: name,
+                price: price,
+                image: image,
+                vendorId: vendor.id
+            }
+        })
+        res.status(200).json({
+            success: true,
+            message: "product added successfully"
+        });
+
+
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Internal server error" + error
+        });
+    }
+
+})
+
 export default vendorRouter;
