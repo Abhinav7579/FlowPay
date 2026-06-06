@@ -41,7 +41,7 @@ Building this from scratch is complex. FlowPay demonstrates exactly how this wor
 
 > ⚠️ All payments are in **Razorpay Test Mode** — no real money is involved.
 >
-> Test Card: `4111 1111 1111 1111` | Expiry: Any future date | CVV: Any 3 digits
+> Test Card: `4100 2800 0000 1007` | Expiry: Any future date | CVV: Any 3 digits
 
 ---
 
@@ -309,7 +309,7 @@ JWT_SECRET=your_jwt_secret
 RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx
 RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxx
 RAZORPAY_WEBHOOK_SECRET=xxxxxxxxxxxxxxxxxxxx
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://default:password@*****
 SMTP_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 ```
@@ -322,8 +322,8 @@ SMTP_PASSWORD=your_app_password
 |---------|---------|
 | Frontend | Vercel |
 | Backend | Railway |
-| Database | Railway PostgreSQL |
-| Redis | Railway Redis |
+| Database | neondb PostgreSQl |
+| Redis | upstash |
 
 ---
 
