@@ -35,9 +35,9 @@ Building this from scratch is complex. FlowPay demonstrates exactly how this wor
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@flowpay.com | admin123 |
-| Vendor | vendor@flowpay.com | vendor123 |
-| Customer | customer@flowpay.com | customer123 |
+| Admin | abhi@gmail.com | abhi123 |
+| Vendor | hazara@gmail.com | hazara123 |
+| Customer | monu@gmail.com | monu123 |
 
 > ⚠️ All payments are in **Razorpay Test Mode** — no real money is involved.
 >
