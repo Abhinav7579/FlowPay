@@ -2,6 +2,7 @@ import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
 import mainRouter from "./route/index.js"
+import "./workers/runAll.js";
 dotenv.config();
 const app = express();
 app.use(cors());
